@@ -187,6 +187,8 @@ def test_calculate_fee_uses_half_even_rounding(amount, expected):
 
 @pytest.mark.parametrize("currency", ["USD", "EUR", "COP"])
 def test_calculate_fee_is_zero_for_zero_amount(currency):
+    # Test de caracterización: describe el comportamiento actual.
+    # La política de fee para monto 0 no está definida (ver FAILURE.MODES.md [n1]).
     fee = calculate_fee(Decimal("0"), currency)
 
     assert str(fee) == "0.00"
@@ -220,7 +222,7 @@ def test_calculate_fee_validates_currency_before_amount():
     [
         (Decimal("100"), "USD", "102.90"),
         (Decimal("100"), "EUR", "102.50"),
-        (Decimal("1"), "USD", "1.30"),
+        (Decimal("1"), "USD", "1.30"),         # Caracterización: política de fee para monto 0 sin definir [n1].
         (Decimal("1000"), "COP", "1900.00"),
         (Decimal("0"), "USD", "0.00"),
         (Decimal("19.999"), "USD", "20.58"),  # 19.999 + 0.58 = 20.579 -> 20.58
