@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation, ROUND_HALF_EVEN
+from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 from typing import Final
-
 
 CENT: Final = Decimal("0.01")
 MAX_AMOUNT: Final = Decimal("100000.00")
