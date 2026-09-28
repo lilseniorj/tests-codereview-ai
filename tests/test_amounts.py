@@ -222,9 +222,9 @@ def test_calculate_fee_validates_currency_before_amount():
     [
         (Decimal("100"), "USD", "102.90"),
         (Decimal("100"), "EUR", "102.50"),
-        (Decimal("1"), "USD", "1.30"),         # Caracterización: política de fee para monto 0 sin definir [n1].
+        (Decimal("1"), "USD", "1.30"),
         (Decimal("1000"), "COP", "1900.00"),
-        (Decimal("0"), "USD", "0.00"),
+        (Decimal("0"), "USD", "0.00"),  # Caracterización: política de fee para monto 0 sin definir [n1].
         (Decimal("19.999"), "USD", "20.58"),  # 19.999 + 0.58 = 20.579 -> 20.58
         (MAX_AMOUNT, "USD", "102900.00"),
     ],
