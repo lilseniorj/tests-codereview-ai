@@ -46,6 +46,9 @@ def normalize_currency(currency: str) -> str:
     if currency is None:
         raise CurrencyError("currency is required")
 
+    if not isinstance(currency, str):
+        raise CurrencyError("unsupported currency type")
+
     normalized = currency.strip().upper()
     if not normalized:
         raise CurrencyError("currency is required")
@@ -57,6 +60,12 @@ def normalize_currency(currency: str) -> str:
 
 
 def validate_amount(amount: Decimal) -> None:
+    if amount is None:
+        raise AmountError("amount is required")
+
+    if isinstance(amount, Decimal) and not amount.is_finite():
+        raise AmountError("amount must be finite")
+
     if amount < Decimal("0"):
         raise AmountError("amount cannot be negative")
 
