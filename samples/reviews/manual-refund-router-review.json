@@ -1,0 +1,189 @@
+[
+  {
+    "rule_id": "SEC-AUTHZ-001",
+    "category": "security",
+    "severity": "blocker",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 127
+    },
+    "message": "El endpoint /admin/refunds construye un User con rol admin a partir del account_id del cuerpo de la peticion, sin autenticar a quien llama, y ese usuario ni siquiera se usa. Cualquier cliente puede emitir reembolsos administrativos, y web/src/refunds.ts (linea 15) ya lo invoca desde el navegador.",
+    "suggested_fix": "Obtener el usuario autenticado del contexto de la peticion, exigir rol admin y verificar su permiso sobre la cuenta antes de llamar a request_refund."
+  },
+  {
+    "rule_id": "SEC-AUTHZ-002",
+    "category": "security",
+    "severity": "blocker",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 105
+    },
+    "message": "El endpoint /accounts/{account_id}/manual-refunds no tiene autenticacion ni autorizacion y account_id no se usa, por lo que cualquiera puede solicitar reembolsos para cualquier cuenta.",
+    "suggested_fix": "Exigir un usuario autenticado, verificar su permiso sobre account_id y comprobar que el pago pertenece a esa cuenta."
+  },
+  {
+    "rule_id": "COR-REFUND-001",
+    "category": "correctness",
+    "severity": "blocker",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 130
+    },
+    "message": "En /admin/refunds, original_amount y refund_amount toman el mismo payload.amount y payment_id nunca se usa: el reembolso no se contrasta con el pago real, asi que se puede reembolsar cualquier importe.",
+    "suggested_fix": "Cargar el pago por payment_id y usar su importe original y lo ya reembolsado; payload.amount solo como refund_amount."
+  },
+  {
+    "rule_id": "COR-REFUND-002",
+    "category": "correctness",
+    "severity": "blocker",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 132
+    },
+    "message": "already_refunded esta fijo en 0.00 en /admin/refunds, y en /manual-refunds (lineas 111-114) el campo already_refunded del payload no se pasa a request_refund. En ambos casos un pago ya reembolsado puede reembolsarse de nuevo.",
+    "suggested_fix": "Pasar el already_refunded real: el del pago en /admin/refunds y parse_amount(payload.already_refunded) en /manual-refunds."
+  },
+  {
+    "rule_id": "COR-INPUT-001",
+    "category": "correctness",
+    "severity": "advisory",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 112
+    },
+    "message": "/manual-refunds construye Decimal directamente con texto del cliente: 'abc' lanza InvalidOperation y 'NaN' falla en validate_amount, excepciones que el except AmountError no captura, por lo que responden 500 en vez de 400.",
+    "suggested_fix": "Usar parse_amount para original_amount y refund_amount, como en /refunds."
+  },
+  {
+    "rule_id": "COR-STATUS-001",
+    "category": "correctness",
+    "severity": "advisory",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 118
+    },
+    "message": "Los endpoints nuevos (lineas 118 y 137) devuelven HTTP 200 aunque la decision sea REJECTED, mientras que /refunds responde 400. Un cliente que solo mire el codigo HTTP tomara un rechazo como exito.",
+    "suggested_fix": "Aplicar la misma regla que /refunds: 400 cuando decision.status != APPROVED."
+  },
+  {
+    "rule_id": "COR-REASON-001",
+    "category": "correctness",
+    "severity": "advisory",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 140
+    },
+    "message": "payload.reason or decision.reason (lineas 121 y 140) permite que el texto del cliente reemplace el motivo de rechazo del sistema en la respuesta.",
+    "suggested_fix": "Devolver siempre decision.reason y exponer el motivo manual en un campo separado."
+  },
+  {
+    "rule_id": "COR-MONEY-001",
+    "category": "correctness",
+    "severity": "advisory",
+    "location": {
+      "file": "web/src/refunds.ts",
+      "line": 23
+    },
+    "message": "Number(input.amount).toString() pasa el monto por float: '' se convierte en '0', 'abc' en 'NaN', montos grandes pierden precision y valores como '1e21' cambian de formato, por lo que la API recibe un importe distinto al que escribio el usuario.",
+    "suggested_fix": "Enviar input.amount como string sin convertir y dejar la validacion a parse_amount en la API, o validar el formato con una expresion regular."
+  },
+  {
+    "rule_id": "COR-HTTP-001",
+    "category": "correctness",
+    "severity": "advisory",
+    "location": {
+      "file": "web/src/refunds.ts",
+      "line": 28
+    },
+    "message": "Cuando response.ok es falso se devuelve el cuerpo de error como si fuera un RefundResponse. El cuerpo de error de FastAPI es {detail}, asi que el llamador recibe status y amount indefinidos, y formatRefundStatus muestra 'undefined: undefined' sin enterarse del fallo.",
+    "suggested_fix": "Lanzar un error con response.status y el detail cuando !response.ok, en vez de devolverlo como respuesta valida."
+  },
+  {
+    "rule_id": "COR-CONTRACT-001",
+    "category": "correctness",
+    "severity": "advisory",
+    "location": {
+      "file": "web/src/refunds.ts",
+      "line": 15
+    },
+    "message": "submitManualRefund llama a /admin/refunds y no a /accounts/{account_id}/manual-refunds: el nombre de la funcion y el endpoint describen contratos distintos, y un flujo de usuario acaba usando la ruta administrativa.",
+    "suggested_fix": "Decidir que endpoint corresponde a este flujo y alinear el nombre de la funcion, la ruta y el cuerpo con ese contrato."
+  },
+  {
+    "rule_id": "SEC-SECRET-001",
+    "category": "security",
+    "severity": "blocker",
+    "location": {
+      "file": ".github/workflows/review.yml",
+      "line": 23
+    },
+    "message": "REVIEW_DEBUG_TOKEN recibe el valor de OPENAI_API_KEY (linea 20) y se imprime con echo en los logs de CI. El enmascarado de GitHub no protege ante valores transformados o parciales, y los logs son visibles para quien tenga acceso al repositorio.",
+    "suggested_fix": "Eliminar REVIEW_DEBUG_TOKEN y el echo; nunca imprimir secretos ni valores derivados de ellos."
+  },
+  {
+    "rule_id": "SEC-PERMS-001",
+    "category": "security",
+    "severity": "blocker",
+    "location": {
+      "file": ".github/workflows/review.yml",
+      "line": 8
+    },
+    "message": "permissions: write-all concede al GITHUB_TOKEN escritura sobre todo el repositorio para un job que solo necesita leer el codigo y comentar el PR.",
+    "suggested_fix": "Declarar permisos minimos, por ejemplo contents: read y pull-requests: write."
+  },
+  {
+    "rule_id": "COR-CI-001",
+    "category": "correctness",
+    "severity": "blocker",
+    "location": {
+      "file": ".github/workflows/review.yml",
+      "line": 22
+    },
+    "message": "El paso ejecuta scripts/run_reviewer.py, que no forma parte del diff, y usa $PR_DIFF, que no se define en ningun lugar del workflow. El job fallara o revisara un diff vacio en cada PR.",
+    "suggested_fix": "Incluir scripts/run_reviewer.py en el PR y generar el diff en un paso previo (por ejemplo git diff contra github.base_ref) exportandolo como PR_DIFF."
+  },
+  {
+    "rule_id": "COR-CI-002",
+    "category": "correctness",
+    "severity": "advisory",
+    "location": {
+      "file": ".github/workflows/review.yml",
+      "line": 16
+    },
+    "message": "Se instala con pip sin actions/setup-python ni version de Python fijada, asi que el resultado depende del Python que traiga la imagen ubuntu-latest en cada momento; el proyecto exige >=3.11.",
+    "suggested_fix": "Agregar actions/setup-python con python-version fijada antes de instalar dependencias."
+  },
+  {
+    "rule_id": "TST-MISSING-001",
+    "category": "tests",
+    "severity": "advisory",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 125
+    },
+    "message": "Los endpoints /manual-refunds y /admin/refunds no tienen pruebas de permisos, sobre-reembolso ni entradas invalidas, que es donde estan los defectos de este PR.",
+    "suggested_fix": "Agregar tests para llamada sin autenticar, usuario sin permiso, pago ya reembolsado, montos 'abc' y 'NaN' (esperar 400) y rechazo con reason del cliente."
+  },
+  {
+    "rule_id": "TST-MISSING-002",
+    "category": "tests",
+    "severity": "info",
+    "location": {
+      "file": "web/src/refunds.ts",
+      "line": 14
+    },
+    "message": "submitManualRefund no tiene pruebas para respuestas no exitosas, errores de red ni montos invalidos.",
+    "suggested_fix": "Agregar tests con fetch simulado para 400, 500, fallo de red y montos como '' o 'abc'."
+  },
+  {
+    "rule_id": "DOC-ENDPOINT-001",
+    "category": "documentation",
+    "severity": "info",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 125
+    },
+    "message": "Los endpoints publicos nuevos no tienen docstring ni summary/description: no explican quien puede usarlos, en que difieren de /refunds ni por que un rechazo responde 200.",
+    "suggested_fix": "Documentar el contrato y los requisitos de autorizacion de cada endpoint en el decorador o en un docstring."
+  }
+]
