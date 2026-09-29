@@ -1,0 +1,123 @@
+[
+  {
+    "rule_id": "COR-IMPORT-001",
+    "category": "correctness",
+    "severity": "blocker",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 103
+    },
+    "message": "Decimal se usa sin estar importado en api.py: toda llamada al endpoint lanza NameError y responde 500, por lo que el reembolso manual nunca funciona.",
+    "suggested_fix": "Usar parse_amount(payload.original_amount) y parse_amount(payload.refund_amount), como en /refunds, en lugar de Decimal(...)."
+  },
+  {
+    "rule_id": "COR-REFUND-001",
+    "category": "correctness",
+    "severity": "blocker",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 102
+    },
+    "message": "already_refunded se recibe en ManualRefundRequest pero no se pasa a request_refund, que asume 0: un pago ya reembolsado por completo puede reembolsarse de nuevo (sobre-reembolso).",
+    "suggested_fix": "Pasar already_refunded=parse_amount(payload.already_refunded) a request_refund."
+  },
+  {
+    "rule_id": "COR-INPUT-001",
+    "category": "correctness",
+    "severity": "advisory",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 104
+    },
+    "message": "Construir Decimal directamente con texto del cliente lanza InvalidOperation para entradas como 'abc' o 'NaN', que el except AmountError no captura: una entrada invalida termina en 500 en vez de 400.",
+    "suggested_fix": "Parsear con parse_amount, que convierte entradas no numericas o no finitas en AmountError."
+  },
+  {
+    "rule_id": "COR-STATUS-001",
+    "category": "correctness",
+    "severity": "advisory",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 109
+    },
+    "message": "Un reembolso rechazado se devuelve con HTTP 200, mientras que /refunds responde 400 cuando la decision no es APPROVED: un cliente que solo mire el codigo HTTP tomara el rechazo como exito.",
+    "suggested_fix": "Aplicar la misma regla que /refunds (400 si status != APPROVED) o documentar explicitamente el contrato distinto."
+  },
+  {
+    "rule_id": "COR-REASON-001",
+    "category": "correctness",
+    "severity": "advisory",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 112
+    },
+    "message": "payload.reason or decision.reason permite que el texto del cliente sustituya el motivo de rechazo del sistema, ocultando por que se rechazo el reembolso.",
+    "suggested_fix": "Devolver siempre decision.reason y exponer el motivo manual en un campo separado."
+  },
+  {
+    "rule_id": "SEC-AUTHZ-001",
+    "category": "security",
+    "severity": "blocker",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 96
+    },
+    "message": "Endpoint de reembolsos manuales sin autenticacion ni autorizacion; account_id no se valida ni se vincula al pago, por lo que cualquiera puede solicitar reembolsos para cualquier cuenta.",
+    "suggested_fix": "Exigir un usuario autenticado, verificar su permiso sobre account_id y comprobar que el pago pertenece a esa cuenta antes de llamar a request_refund."
+  },
+  {
+    "rule_id": "SEC-INPUT-001",
+    "category": "security",
+    "severity": "info",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 43
+    },
+    "message": "reason es texto libre sin limite de longitud que se refleja tal cual en la respuesta; es una entrada no acotada si acaba en logs o paneles.",
+    "suggested_fix": "Limitar la longitud con Field(max_length=...)."
+  },
+  {
+    "rule_id": "TST-MISSING-001",
+    "category": "tests",
+    "severity": "advisory",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 96
+    },
+    "message": "El endpoint nuevo no tiene pruebas; un solo test del camino feliz habria detectado el NameError.",
+    "suggested_fix": "Agregar tests para reembolso aprobado, monto 0, pago ya reembolsado (already_refunded), entradas 'abc' y 'NaN' (esperar 400) y reason del cliente en un rechazo."
+  },
+  {
+    "rule_id": "STY-UNUSED-001",
+    "category": "style",
+    "severity": "info",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 98
+    },
+    "message": "account_id se declara pero nunca se usa, lo que sugiere un control por cuenta que no existe.",
+    "suggested_fix": "Usarlo en la verificacion de autorizacion o retirarlo de la ruta."
+  },
+  {
+    "rule_id": "STY-DUP-001",
+    "category": "style",
+    "severity": "info",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 39
+    },
+    "message": "ManualRefundRequest duplica los campos de RefundRequest y usa str | None mientras el archivo usa Optional[str].",
+    "suggested_fix": "Heredar de RefundRequest y declarar solo reason, con el mismo estilo de tipado que el resto del archivo."
+  },
+  {
+    "rule_id": "DOC-ENDPOINT-001",
+    "category": "documentation",
+    "severity": "info",
+    "location": {
+      "file": "src/payments_svc/api.py",
+      "line": 96
+    },
+    "message": "Endpoint publico nuevo sin docstring ni summary/description: no explica en que difiere de /refunds, para que sirve reason ni por que un rechazo responde 200.",
+    "suggested_fix": "Documentar el contrato del endpoint en el decorador o en un docstring."
+  }
+]
