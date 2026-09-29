@@ -53,3 +53,34 @@ class TestRefunds(unittest.TestCase):
     def test_assert_refundable_raises_for_rejected_refund(self):
         with self.assertRaises(AmountError):
             assert_refundable(Decimal("100.00"), Decimal("0.00"))
+
+    def test_request_refund_rejects_negative_already_refunded(self):
+        with self.assertRaises(AmountError):
+            request_refund(
+                original_amount=Decimal("100.00"),
+                refund_amount=Decimal("10.00"),
+                already_refunded=Decimal("-10.00"),
+            )
+
+    def test_request_refund_rejects_payment_refunded_beyond_original(self):
+        decision = request_refund(
+            original_amount=Decimal("100.00"),
+            refund_amount=Decimal("10.00"),
+            already_refunded=Decimal("120.00"),
+        )
+
+        self.assertEqual(decision.status, RefundStatus.REJECTED)
+        self.assertEqual(decision.amount, Decimal("0.00"))
+        self.assertEqual(decision.reason, "payment is already fully refunded")
+
+    def test_assert_refundable_allows_approved_refund(self):
+        try:
+            assert_refundable(Decimal("100.00"), Decimal("25.00"))
+        except AmountError as exc:
+            self.fail(f"assert_refundable raised for a valid refund: {exc}")
+
+    def test_assert_refundable_error_carries_rejection_reason(self):
+        with self.assertRaises(AmountError) as ctx:
+            assert_refundable(Decimal("100.00"), Decimal("0.00"))
+
+        self.assertEqual(str(ctx.exception), "refund amount must be greater than zero")
